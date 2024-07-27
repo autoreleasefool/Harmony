@@ -14,9 +14,10 @@ public protocol CloudKitEncodable: Encodable {}
 public protocol CloudKitDecodable: Decodable {}
 
 public protocol HRecord: CloudKitEncodable & CloudKitDecodable & FetchableRecord & PersistableRecord {
+    associatedtype ID: DatabaseValueConvertible, LosslessStringConvertible
 
     // Required model values
-    var id: UUID { get }
+    var id: ID { get }
 //    var isDeleted: Bool { get set }
 
     // CloudKit values
@@ -64,7 +65,7 @@ extension HRecord {
 
     public var recordID: CKRecord.ID {
         CKRecord.ID(
-            recordName: "\(Self.recordType)|\(id.uuidString)",
+            recordName: "\(Self.recordType)|\(id)",
             zoneID: zoneID
         )
     }
@@ -86,6 +87,21 @@ extension HRecord {
             try cloudRecord.updateChanges(db, from: self)
         }
     }
+
+	static func parseID(from string: String) -> Self.ID? {
+		ID(string)
+	}
+
+	static func fetchOne(_ db: Database, convertibleKey: String) throws -> Self? {
+		guard let key = ID(convertibleKey) else { return nil }
+		return try Self.fetchOne(db, key: key)
+	}
+
+	@discardableResult
+	static func deleteOne(_ db: Database, convertibleKey: String) throws -> Bool {
+		guard let key = ID(convertibleKey) else { return false }
+		return try deleteOne(db, key: key)
+	}
 
     mutating func setLastKnownRecordIfNewer(_ otherRecord: CKRecord) {
         let localRecord = self.archivedRecord
